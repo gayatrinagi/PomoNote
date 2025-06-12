@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pomodoro App with Dashboard</title>
+  <style>
+    :root {
+      --bg: #1e1e1e;
+      --primary: #ff4c4c;
+      --text: #ffffff;
+      --accent: #2e2e2e;
+    }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    nav {
+      background: var(--accent);
+      padding: 10px 20px;
+      display: flex;
+      gap: 20px;
+    }
+    nav button {
+      background: none;
+      border: none;
+      color: var(--text);
+      font-size: 16px;
+      cursor: pointer;
+    }
+    nav button.active {
+      color: var(--primary);
+      font-weight: bold;
+    }
+    .container {
+      display: flex;
+      flex: 1;
+    }
+    .section {
+      flex: 1;
+      padding: 20px;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+    }
+    .section.active {
+      display: flex;
+    }
+    .tabs, .controls, #checkmarks, #heatmap {
+      margin-top: 20px;
+    }
+    .tab, .controls button {
+      background: var(--primary);
+      color: var(--text);
+      border: none;
+      border-radius: 5px;
+      padding: 10px 20px;
+      cursor: pointer;
+    }
+    .tab.active {
+      background: #ff6666;
+    }
+    #timer {
+      font-size: 72px;
+      margin-top: 20px;
+    }
+    #heatmap {
+      display: grid;
+      grid-template-columns: repeat(7, 30px);
+      gap: 4px;
+    }
+    .day-box {
+      width: 30px;
+      height: 30px;
+      background-color: #333;
+      border-radius: 4px;
+    }
+    #todo-list {
+      width: 100%;
+      max-width: 500px;
+      margin-top: 20px;
+    }
+    #todo-list input {
+      width: 70%;
+      padding: 10px;
+      border: none;
+      border-radius: 4px;
+    }
+    #todo-list button {
+      padding: 10px;
+      margin-left: 10px;
+    }
+    .task {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #2a2a2a;
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    .task.completed span {
+      text-decoration: line-through;
+      color: #888;
+    }
+    .timestamp {
+      font-size: 12px;
+      color: #aaa;
+    }
+    #dashboard ul {
+      list-style: none;
+      padding: 0;
+    }
+    #dashboard li {
+      background: #2e2e2e;
+      padding: 10px;
+      border-radius: 4px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+    <header style="background: var(--accent); text-align: center; padding: 20px 10px;">
+  <h1 style="margin: 0; color: var(--primary); font-size: 32px;">Pomonote</h1>
+  <p style="margin: 5px 0 0; color: var(--text); font-size: 16px;">Focus Better. Plan Smarter. Learn Deeper.</p>
+</header>
+
+  <nav>
+    <button class="active" onclick="switchSection('pomodoro')">Pomodoro</button>
+    <button onclick="switchSection('todo')">To-Do List</button>
+    <button onclick="switchSection('dashboard')">Dashboard</button>
+    <button onclick="switchSection('notes')">Notes</button>
+  </nav>
+
+  <div class="container">
+    <div id="pomodoro" class="section active">
+      <h1>Pomodoro Timer</h1>
+      <div class="tabs">
+        <button class="tab active" onclick="setMode('pomodoro')">Pomodoro</button>
+        <button class="tab" onclick="setMode('short')">Short Break</button>
+        <button class="tab" onclick="setMode('long')">Long Break</button>
+      </div>
+      <div id="timer">25:00</div>
+      <div class="controls">
+        <button onclick="startTimer()">Start</button>
+        <button onclick="resetTimer()">Reset</button>
+      </div>
+      <div id="checkmarks"></div>
+    </div>
+
+    <div id="todo" class="section">
+      <h1>To-Do List</h1>
+      <div id="todo-list">
+        <input id="new-task" placeholder="New task" />
+        <button onclick="addTask()">Add</button>
+        <div id="tasks"></div>
+      </div>
+    </div>
+
+    <div id="dashboard" class="section">
+      <h1>Dashboard</h1>
+      <div id="heatmap"></div>
+      <ul id="dashboard-content"></ul>
+    </div>
+
+    <div id="notes" class="section">
+      <h1>Cornell Notes</h1>
+      <div style="display: flex; flex-direction: column; gap: 20px; width: 100%; max-width: 700px;">
+        <div style="display: flex; gap: 10px;">
+          <textarea id="cue" placeholder="Cues (Keywords/Questions)" style="width: 30%; height: 300px; padding: 10px; border-radius: 6px; background: #2e2e2e; color: white;"></textarea>
+          <textarea id="notes-area" placeholder="Notes (Detailed explanation)" style="width: 70%; height: 300px; padding: 10px; border-radius: 6px; background: #2e2e2e; color: white;"></textarea>
+        </div>
+        <textarea id="summary" placeholder="Summary (Brief explanation)" style="width: 100%; height: 100px; padding: 10px; border-radius: 6px; background: #2e2e2e; color: white;"></textarea>
+        <button onclick="saveCornellNote()" style="padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: 5px; cursor: pointer;">Save Note</button>
+        <div id="note-log" style="margin-top: 20px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let timer = null;
+    let timeLeft = 25 * 60;
+    let pomodoroCount = 0;
+    let mode = 'pomodoro';
+
+    const durations = {
+      pomodoro: 25 * 60,
+      short: 5 * 60,
+      long: 15 * 60
+    };
+
+    function switchSection(sectionId) {
+      document.querySelectorAll('nav button').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active'));
+      document.querySelector(`nav button[onclick*="${sectionId}"]`).classList.add('active');
+      document.getElementById(sectionId).classList.add('active');
+      if (sectionId === 'dashboard') renderDashboard();
+      if (sectionId === 'notes') renderCornellNotes();
+    }
+
+    function setMode(newMode) {
+      mode = newMode;
+      timeLeft = durations[mode];
+      document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
+      document.querySelector(`.tab[onclick="setMode('${newMode}')"]`).classList.add('active');
+      updateTimerDisplay();
+    }
+
+    function startTimer() {
+      if (timer) return;
+      timer = setInterval(() => {
+        if (timeLeft > 0) {
+          timeLeft--;
+          updateTimerDisplay();
+        } else {
+          clearInterval(timer);
+          timer = null;
+          if (mode === 'pomodoro') {
+            pomodoroCount++;
+            updateCheckmarks();
+            logPomodoro();
+          }
+          alert(mode === 'pomodoro' ? 'Pomodoro done! Take a break.' : 'Break over! Time to work!');
+        }
+      }, 1000);
+    }
+
+    function resetTimer() {
+      clearInterval(timer);
+      timer = null;
+      timeLeft = durations[mode];
+      updateTimerDisplay();
+    }
+
+    function updateTimerDisplay() {
+      const mins = Math.floor(timeLeft / 60).toString().padStart(2, '0');
+      const secs = (timeLeft % 60).toString().padStart(2, '0');
+      document.getElementById("timer").textContent = `${mins}:${secs}`;
+    }
+
+    function updateCheckmarks() {
+      document.getElementById("checkmarks").innerHTML = '✔️'.repeat(pomodoroCount % 4);
+    }
+
+    function logPomodoro() {
+      const log = JSON.parse(localStorage.getItem("pomodoroLog") || "[]");
+      log.push(new Date().toISOString());
+      localStorage.setItem("pomodoroLog", JSON.stringify(log));
+      renderHeatmap();
+    }
+
+    function renderHeatmap() {
+      const log = JSON.parse(localStorage.getItem("pomodoroLog") || "[]");
+      const today = new Date();
+      const start = new Date(today);
+      start.setDate(today.getDate() - today.getDay());
+      const container = document.getElementById("heatmap");
+      container.innerHTML = '';
+      for (let i = 0; i < 7; i++) {
+        const day = new Date(start);
+        day.setDate(start.getDate() + i);
+        const iso = day.toISOString().split('T')[0];
+        const count = log.filter(l => l.startsWith(iso)).length;
+        const color = count === 0 ? '#333' : count < 2 ? '#555' : count < 4 ? '#777' : '#ff4c4c';
+        const box = document.createElement("div");
+        box.className = "day-box";
+        box.style.backgroundColor = color;
+        container.appendChild(box);
+      }
+    }
+
+    function addTask() {
+      const input = document.getElementById("new-task");
+      const task = input.value.trim();
+      if (!task) return;
+      const tasks = JSON.parse(localStorage.getItem("tasks") || "[]");
+      tasks.push({ text: task, completed: false, timestamp: new Date().toLocaleString() });
+      localStorage.setItem("tasks", JSON.stringify(tasks));
+      input.value = '';
+      renderTasks();
+    }
+
+    function renderTasks() {
+      const tasks = JSON.parse(localStorage.getItem("tasks") || "[]");
+      const container = document.getElementById("tasks");
+      container.innerHTML = '';
+      tasks.forEach((task, index) => {
+        const div = document.createElement("div");
+        div.className = "task" + (task.completed ? " completed" : "");
+        div.innerHTML = `
+          <span>${task.text}</span>
+          <div>
+            <span class="timestamp">${task.timestamp}</span>
+            <button onclick="toggleTask(${index})">✔</button>
+            <button onclick="deleteTask(${index})">🗑</button>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function toggleTask(index) {
+      const tasks = JSON.parse(localStorage.getItem("tasks") || "[]");
+      tasks[index].completed = !tasks[index].completed;
+      localStorage.setItem("tasks", JSON.stringify(tasks));
+      renderTasks();
+    }
+
+    function deleteTask(index) {
+      const tasks = JSON.parse(localStorage.getItem("tasks") || "[]");
+      tasks.splice(index, 1);
+      localStorage.setItem("tasks", JSON.stringify(tasks));
+      renderTasks();
+    }
+
+    function renderDashboard() {
+      const tasks = JSON.parse(localStorage.getItem("tasks") || "[]");
+      const log = JSON.parse(localStorage.getItem("pomodoroLog") || "[]");
+      const ul = document.getElementById("dashboard-content");
+      const done = tasks.filter(t => t.completed).length;
+      const pending = tasks.length - done;
+      ul.innerHTML = `
+        <li><strong>Pomodoro Sessions:</strong> ${log.length}</li>
+        <li><strong>Completed Tasks:</strong> ${done}</li>
+        <li><strong>Pending Tasks:</strong> ${pending}</li>
+      `;
+      renderHeatmap();
+    }
+
+    function saveCornellNote() {
+      const cue = document.getElementById('cue').value.trim();
+      const notes = document.getElementById('notes-area').value.trim();
+      const summary = document.getElementById('summary').value.trim();
+      if (!cue && !notes && !summary) return;
+      const saved = JSON.parse(localStorage.getItem('cornellNotes') || '[]');
+      saved.push({ date: new Date().toLocaleString(), cue, notes, summary });
+      localStorage.setItem('cornellNotes', JSON.stringify(saved));
+      document.getElementById('cue').value = '';
+      document.getElementById('notes-area').value = '';
+      document.getElementById('summary').value = '';
+      renderCornellNotes();
+    }
+
+    function renderCornellNotes() {
+  const notes = JSON.parse(localStorage.getItem('cornellNotes') || '[]');
+  const logDiv = document.getElementById('note-log');
+  logDiv.innerHTML = '';
+  notes.slice().reverse().forEach((note, idx) => {
+    const actualIndex = notes.length - 1 - idx;
+    const div = document.createElement('div');
+    div.style.background = '#2a2a2a';
+    div.style.padding = '10px';
+    div.style.borderRadius = '6px';
+    div.style.marginTop = '10px';
+    div.innerHTML = `
+      <div><strong>${note.date}</strong></div>
+      <div><strong>Cues:</strong> ${note.cue}</div>
+      <div><strong>Notes:</strong> ${note.notes}</div>
+      <div><strong>Summary:</strong> ${note.summary}</div>
+      <button onclick="exportNotePDF(${actualIndex})" style="margin-top: 10px;">Export to PDF</button>
+      <button onclick="deleteCornellNote(${actualIndex})" style="margin-top: 10px; margin-left: 10px;">🗑 Delete</button>
+    `;
+    logDiv.appendChild(div);
+  });
+}
+
+
+    function exportNotePDF(index) {
+      const notes = JSON.parse(localStorage.getItem('cornellNotes') || '[]');
+      const note = notes[index];
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.setFontSize(16);
+      doc.setTextColor(200, 0, 0);
+      doc.text("Cornell Notes", 20, 20);
+      doc.setDrawColor(0);
+      doc.setFillColor(224, 255, 224);
+      doc.rect(10, 30, 50, 190, 'F');
+      doc.setFillColor(224, 240, 255);
+      doc.rect(60, 30, 140, 190, 'F');
+      doc.setFillColor(255, 255, 204);
+      doc.rect(10, 220, 190, 60, 'F');
+      doc.setFontSize(10);
+      doc.setTextColor(0);
+      doc.text(`Date: ${note.date}`, 150, 20);
+      doc.setFontSize(12);
+      doc.text("Cues", 15, 37);
+      doc.text("Notes", 65, 37);
+      doc.setFontSize(10);
+      doc.text(doc.splitTextToSize(note.cue, 45), 15, 45);
+      doc.text(doc.splitTextToSize(note.notes, 130), 65, 45);
+      doc.setFontSize(12);
+      doc.text("Summary", 15, 227);
+      doc.setFontSize(10);
+      doc.text(doc.splitTextToSize(note.summary, 180), 15, 235);
+      doc.text(`Page 1`, 180, 290);
+      doc.save(`Cornell_Note_${index + 1}.pdf`);
+    }
+    function deleteCornellNote(index) {
+  const notes = JSON.parse(localStorage.getItem('cornellNotes') || '[]');
+  notes.splice(index, 1);
+  localStorage.setItem('cornellNotes', JSON.stringify(notes));
+  renderCornellNotes();
+}
+
+    // Initial Render
+    updateTimerDisplay();
+    renderTasks();
+    renderHeatmap();
+    renderCornellNotes();
+  </script>
+</body>
+</html>
